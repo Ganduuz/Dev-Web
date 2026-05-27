@@ -1,0 +1,39 @@
+services:
+
+  mongo:
+    image: mongo
+    container_name: mongo
+    ports:
+      - "27017:27017"
+
+  user:
+    build: ./services/user
+    ports:
+      - "3001:3001"
+    depends_on:
+      - mongo
+
+  mission:
+    build: ./services/mission
+    ports:
+      - "3002:3002"
+
+  tracking:
+    build: ./services/tracking
+    ports:
+      - "3003:3003"
+
+  facturation:
+    build: ./services/facturation
+    ports:
+      - "3004:3004"
+
+  notification:
+    build: ./services/notification
+    ports:
+      - "3005:3005"
+
+  gateway:
+    build: ./gateway
+    ports:
+      - "3000:3000"

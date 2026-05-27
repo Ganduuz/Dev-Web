@@ -1,0 +1,20 @@
+{
+  "name": "transvirex-erp",
+  "version": "1.0.0",
+  "description": "Projet 2 - Transvirex Logistics",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ganduuz/Dev-Web.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Ganduuz/Dev-Web/issues"
+  },
+  "homepage": "https://github.com/Ganduuz/Dev-Web#readme"
+}

@@ -1,0 +1,8 @@
+{
+  "name": "mission-service",
+  "version": "1.0.0",
+  "dependencies": {
+    "express": "^4.18.2",
+    "mongoose": "^9.6.2"
+  }
+}
