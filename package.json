@@ -1,5 +1,4 @@
 {
-<<<<<<< HEAD
   "name": "transvirex-erp",
   "version": "1.0.0",
   "description": "Projet 2 - Transvirex Logistics",
@@ -17,12 +16,10 @@
   "bugs": {
     "url": "https://github.com/Ganduuz/Dev-Web/issues"
   },
-  "homepage": "https://github.com/Ganduuz/Dev-Web#readme"
-=======
+  "homepage": "https://github.com/Ganduuz/Dev-Web#readme",
   "devDependencies": {
     "autoprefixer": "^10.5.0",
     "postcss": "^8.5.15",
     "tailwindcss": "^4.3.0"
   }
->>>>>>> 265f5fc (merge github + local)
 }
