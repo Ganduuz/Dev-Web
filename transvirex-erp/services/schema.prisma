@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Mission {
+  id            String        @id @default(uuid())
+  reference     String        @unique @default(cuid())
+  chauffeurId   String
+  dispatcherId  String
+  clientNom     String
+  adresseDepart String
+  adresseArrivee String
+  dateDepart    DateTime
+  dateLivraison DateTime?
+  statut        StatutMission @default(EN_ATTENTE)
+  priorite      Priorite      @default(NORMALE)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  incidents Incident[]
+}
+
+model Incident {
+  id          String   @id @default(uuid())
+  missionId   String
+  mission     Mission  @relation(fields: [missionId], references: [id])
+  type        String
+  description String
+  signalePar  String
+  createdAt   DateTime @default(now())
+}
+
+enum StatutMission {
+  EN_ATTENTE
+  ASSIGNEE
+  EN_COURS
+  LIVREE
+  INCIDENT
+  ANNULEE
+}
+
+enum Priorite {
+  BASSE
+  NORMALE
+  HAUTE
+  URGENTE
+}

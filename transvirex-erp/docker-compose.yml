@@ -1,0 +1,73 @@
+services:
+
+  mongo:
+    image: mongo
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+
+  gateway:
+    build: ./gateway
+    ports:
+      - "3000:3000"
+    depends_on:
+      - user
+      - mission
+      - tracking
+      - facturation
+      - notification
+      - drivers
+      - kpi
+
+  user:
+    build: ./services/user
+    ports:
+      - "3001:3001"
+    depends_on:
+      - mongo
+
+  mission:
+    build: ./services/mission
+    ports:
+      - "3002:3002"
+    depends_on:
+      - mongo
+
+  tracking:
+    build: ./services/tracking
+    ports:
+      - "3003:3003"
+    depends_on:
+      - mongo
+
+  facturation:
+    facturation:
+    container_name: facturation
+    ports:
+      - "3004:3004"
+
+  notification:
+    build: ./services/notification
+    ports:
+      - "3005:3005"
+    depends_on:
+      - mongo
+
+  drivers:
+    build: ./services/drivers
+    ports:
+      - "3006:3006"
+    depends_on:
+      - mongo
+
+  kpi:
+    build: ./services/kpi
+    ports:
+      - "3007:3007"
+    depends_on:
+      - mongo
+
+volumes:
+  mongodata:

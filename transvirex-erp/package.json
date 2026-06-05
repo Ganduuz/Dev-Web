@@ -1,0 +1,16 @@
+{
+  "name": "transvirex-erp",
+  "version": "1.0.0",
+  "description": "Transvirex ERP Microservices Project",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ganduuz/Dev-Web.git"
+  }
+}
