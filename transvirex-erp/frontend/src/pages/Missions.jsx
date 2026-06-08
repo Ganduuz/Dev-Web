@@ -1,28 +1,39 @@
 import { useState, useEffect } from "react";
 import { getMissions, createMission, updateStatut, assignerMission, signalerIncident, deleteMission } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import axios from "axios";
 
-const STATUTS = ["en_attente","assignee","en_cours","livree","incident","annulee"];
+const API_BASE = "http://localhost:3000";
+
+const STATUTS = ["en_attente","acceptee","assignee","en_cours","livree","incident","annulee"];
 const PRIORITES = ["basse","normale","haute","urgente"];
 
 const BADGE = {
-  en_attente:"badge-gray", assignee:"badge-blue", en_cours:"badge-amber",
-  livree:"badge-green", incident:"badge-red", annulee:"badge-gray",
+  en_attente:"badge-gray", acceptee:"badge-blue", assignee:"badge-blue", en_cours:"badge-amber",
+  livree:"badge-green", incident:"badge-red", annulee:"badge-gray", refusee:"badge-red"
 };
 const PBADGE = { basse:"badge-gray", normale:"badge-blue", haute:"badge-amber", urgente:"badge-red" };
 
 export default function Missions() {
   const { user } = useAuth();
   const [missions, setMissions]   = useState([]);
+  const [historique, setHistorique] = useState([]);
   const [loading,  setLoading]    = useState(true);
+  const [tab, setTab] = useState("actives"); // actives, historique
   const [showModal,setShowModal]  = useState(false);
   const [showInc,  setShowInc]    = useState(null);
+  const [refuserModal, setRefuserModal] = useState(null);
   const [filter,   setFilter]     = useState({ statut:"", priorite:"" });
-  const [form,     setForm]       = useState({ chauffeurId:"", clientNom:"", adresseDepart:"", adresseArrivee:"", dateDepart:"", priorite:"normale", notes:"" });
-  const [incForm,  setIncForm]    = useState({ type:"", description:"" });
+  const [form,     setForm]       = useState({ chauffeurId:"", clientNom:"", adresseDepart:"", adresseArrivee:"", dateDepart:"", priorite:"normale", notes:"", montant:"" });
+  const [incForm,  setIncForm]    = useState({ type:"", description:"", severity:"medium" });
+  const [refuseForm, setRefuseForm] = useState({ raison: "" });
   const [msg,      setMsg]        = useState("");
 
+  const isChauffeur = user?.role === "chauffeur";
   const isDispatcher = ["dispatcher","admin"].includes(user?.role);
+  const isDirection = ["direction","admin"].includes(user?.role);
+  const token = localStorage.getItem("token");
+  const headers = { Authorization: `Bearer ${token}` };
 
   async function load() {
     setLoading(true);
@@ -30,54 +41,151 @@ export default function Missions() {
       const params = {};
       if (filter.statut)   params.statut   = filter.statut;
       if (filter.priorite) params.priorite = filter.priorite;
-      if (user?.role === "chauffeur") params.chauffeurId = user._id;
-      const res = await getMissions(params);
-      setMissions(res.data);
-    } finally { setLoading(false); }
+      
+      let missionsList = [];
+      let historiqueList = [];
+
+      // Charger missions actuelles
+      if (isChauffeur) {
+        const res = await getMissions(params);
+        missionsList = res.data.filter(m => !["livree","incident","annulee"].includes(m.statut));
+        historiqueList = res.data.filter(m => ["livree","incident","annulee"].includes(m.statut));
+      } else {
+        const res = await getMissions(params);
+        missionsList = res.data;
+      }
+      
+      setMissions(missionsList);
+      setHistorique(historiqueList);
+    } catch (err) {
+      console.error(err);
+      setMsg("Erreur lors du chargement");
+    } finally { 
+      setLoading(false); 
+    }
   }
 
-  useEffect(() => { load(); }, [filter]);
+  useEffect(() => { load(); }, [filter, isChauffeur]);
 
   async function handleCreate(e) {
     e.preventDefault();
     try {
-      await createMission(form);
+      await createMission({...form, montant: parseFloat(form.montant || 0)});
       setShowModal(false);
-      setForm({ chauffeurId:"", clientNom:"", adresseDepart:"", adresseArrivee:"", dateDepart:"", priorite:"normale", notes:"" });
-      setMsg("Mission créée ✅"); load();
-    } catch (err) { setMsg("Erreur : " + (err.response?.data?.error || err.message)); }
+      setForm({ chauffeurId:"", clientNom:"", adresseDepart:"", adresseArrivee:"", dateDepart:"", priorite:"normale", notes:"", montant:"" });
+      setMsg("Mission créée ✅"); 
+      setTimeout(() => setMsg(""), 3000);
+      load();
+    } catch (err) { 
+      setMsg("Erreur : " + (err.response?.data?.error || err.message)); 
+    }
   }
 
   async function handleStatut(id, statut) {
-    try { await updateStatut(id, statut); load(); } catch {}
+    try { 
+      await updateStatut(id, statut); 
+      setMsg(`Mission ${statut} ✅`);
+      setTimeout(() => setMsg(""), 3000);
+      load(); 
+    } catch (err) {
+      setMsg("Erreur : " + err.message);
+    }
+  }
+
+  async function handleAccepter(id) {
+    try {
+      await axios.patch(`${API_BASE}/missions/${id}/accepter`, {}, { headers });
+      setMsg("Mission acceptée ✅");
+      setTimeout(() => setMsg(""), 3000);
+      load();
+    } catch (err) {
+      setMsg("Erreur : " + (err.response?.data?.error || err.message));
+    }
+  }
+
+  async function handleRefuser(id) {
+    try {
+      await axios.patch(`${API_BASE}/missions/${id}/refuser`, { raison: refuseForm.raison }, { headers });
+      setRefuserModal(null);
+      setRefuseForm({ raison: "" });
+      setMsg("Mission refusée");
+      setTimeout(() => setMsg(""), 3000);
+      load();
+    } catch (err) {
+      setMsg("Erreur : " + (err.response?.data?.error || err.message));
+    }
+  }
+
+  async function handleTerminer(id) {
+    try {
+      await axios.patch(`${API_BASE}/missions/${id}/terminer`, {}, { headers });
+      setMsg("Livraison terminée ✅");
+      setTimeout(() => setMsg(""), 3000);
+      load();
+    } catch (err) {
+      setMsg("Erreur : " + (err.response?.data?.error || err.message));
+    }
   }
 
   async function handleIncident(e) {
     e.preventDefault();
     try {
       await signalerIncident(showInc, incForm);
-      setShowInc(null); setIncForm({ type:"", description:"" }); load();
-    } catch (err) { alert(err.response?.data?.error || "Erreur"); }
+      setShowInc(null); 
+      setIncForm({ type:"", description:"", severity:"medium" }); 
+      setMsg("Incident signalé");
+      setTimeout(() => setMsg(""), 3000);
+      load();
+    } catch (err) { 
+      setMsg("Erreur : " + (err.response?.data?.error || err.message));
+    }
   }
 
   async function handleDelete(id) {
     if (!window.confirm("Supprimer cette mission ?")) return;
-    await deleteMission(id); load();
+    try {
+      await deleteMission(id); 
+      load();
+    } catch (err) {
+      setMsg("Erreur");
+    }
   }
+
+  const displayMissions = tab === "actives" ? missions : historique;
 
   return (
     <div>
       <div className="topbar">
         <span className="topbar-title">🚚 Missions</span>
         <div className="topbar-actions">
-          <select value={filter.statut} onChange={e => setFilter({...filter, statut:e.target.value})} style={{width:140}}>
-            <option value="">Tous statuts</option>
-            {STATUTS.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <select value={filter.priorite} onChange={e => setFilter({...filter, priorite:e.target.value})} style={{width:140}}>
-            <option value="">Toutes priorités</option>
-            {PRIORITES.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
+          {isChauffeur && (
+            <div style={{display:"flex",gap:8}}>
+              <button 
+                className={`btn ${tab === "actives" ? "btn-primary" : "btn-ghost"}`}
+                onClick={() => setTab("actives")}
+              >
+                📋 Actives ({missions.length})
+              </button>
+              <button 
+                className={`btn ${tab === "historique" ? "btn-primary" : "btn-ghost"}`}
+                onClick={() => setTab("historique")}
+              >
+                📜 Historique ({historique.length})
+              </button>
+            </div>
+          )}
+          {!isChauffeur && (
+            <>
+              <select value={filter.statut} onChange={e => setFilter({...filter, statut:e.target.value})} style={{width:140}}>
+                <option value="">Tous statuts</option>
+                {STATUTS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <select value={filter.priorite} onChange={e => setFilter({...filter, priorite:e.target.value})} style={{width:140}}>
+                <option value="">Toutes priorités</option>
+                {PRIORITES.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </>
+          )}
           {isDispatcher && (
             <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Nouvelle mission</button>
           )}
@@ -90,8 +198,8 @@ export default function Missions() {
         <div className="card">
           {loading ? (
             <div className="loading"><div className="spinner"/> Chargement...</div>
-          ) : missions.length === 0 ? (
-            <div className="empty-state"><div className="icon">🚚</div><p>Aucune mission trouvée</p></div>
+          ) : displayMissions.length === 0 ? (
+            <div className="empty-state"><div className="icon">🚚</div><p>{tab === "actives" ? "Aucune mission active" : "Aucun historique"}</p></div>
           ) : (
             <div className="table-wrap">
               <table>
@@ -99,45 +207,52 @@ export default function Missions() {
                   <tr>
                     <th>Référence</th>
                     <th>Client</th>
-                    <th>Départ</th>
-                    <th>Arrivée</th>
+                    <th>Départ → Arrivée</th>
                     <th>Date</th>
                     <th>Statut</th>
                     <th>Priorité</th>
+                    {!isChauffeur && <th>Montant</th>}
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {missions.map(m => (
+                  {displayMissions.map(m => (
                     <tr key={m._id}>
                       <td><b>{m.reference}</b></td>
                       <td>{m.clientNom}</td>
-                      <td style={{maxWidth:130,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.adresseDepart}</td>
-                      <td style={{maxWidth:130,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.adresseArrivee}</td>
-                      <td>{new Date(m.dateDepart).toLocaleDateString("fr-FR")}</td>
+                      <td style={{fontSize:12,maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                        {m.adresseDepart?.split(',')[0]} → {m.adresseArrivee?.split(',')[0]}
+                      </td>
+                      <td>{new Date(m.dateDepart).toLocaleDateString("fr-FR", {year:'2-digit',month:'2-digit',day:'2-digit'})}</td>
                       <td><span className={`badge ${BADGE[m.statut]}`}>{m.statut}</span></td>
                       <td><span className={`badge ${PBADGE[m.priorite]}`}>{m.priorite}</span></td>
+                      {!isChauffeur && <td>{m.montant || 0}€</td>}
                       <td>
-                        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                          {user?.role === "chauffeur" && m.statut === "assignee" && (
-                            <button className="btn btn-green btn-sm" onClick={() => handleStatut(m._id,"en_cours")}>▶ Démarrer</button>
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap",fontSize:12}}>
+                          {/* CHAUFFEUR ACTIONS */}
+                          {isChauffeur && m.statut === "assignee" && (
+                            <>
+                              <button className="btn btn-green btn-sm" onClick={() => handleAccepter(m._id)}>✅ Accepter</button>
+                              <button className="btn btn-red btn-sm" onClick={() => setRefuserModal(m._id)}>❌ Refuser</button>
+                            </>
                           )}
-                          {user?.role === "chauffeur" && m.statut === "en_cours" && (
-                            <button className="btn btn-green btn-sm" onClick={() => handleStatut(m._id,"livree")}>✅ Livrer</button>
+                          {isChauffeur && m.statut === "acceptee" && (
+                            <button className="btn btn-amber btn-sm" onClick={() => handleStatut(m._id,"en_cours")}>▶ Démarrer</button>
                           )}
-                          {["chauffeur","dispatcher","admin"].includes(user?.role) && !["livree","annulee"].includes(m.statut) && (
+                          {isChauffeur && m.statut === "en_cours" && (
+                            <button className="btn btn-green btn-sm" onClick={() => handleTerminer(m._id)}>✅ Terminer</button>
+                          )}
+                          {/* INCIDENT */}
+                          {["chauffeur","dispatcher","admin"].includes(user?.role) && !["livree","annulee","refusee"].includes(m.statut) && (
                             <button className="btn btn-ghost btn-sm" onClick={() => setShowInc(m._id)}>⚠️ Incident</button>
+                          )}
+                          {/* DISPATCHER ACTIONS */}
+                          {isDispatcher && m.statut === "en_attente" && (
+                            <button className="btn btn-blue btn-sm" onClick={() => handleStatut(m._id,"assignee")}>📋 Assigner</button>
                           )}
                           {isDispatcher && (
                             <>
-                              <select
-                                style={{padding:"4px 8px",fontSize:12,borderRadius:6,border:"1px solid var(--border)"}}
-                                value={m.statut}
-                                onChange={e => handleStatut(m._id, e.target.value)}
-                              >
-                                {STATUTS.map(s => <option key={s} value={s}>{s}</option>)}
-                              </select>
-                              <button className="btn btn-red btn-sm" onClick={() => handleDelete(m._id)}>🗑</button>
+                              <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(m._id)}>🗑</button>
                             </>
                           )}
                         </div>
@@ -160,7 +275,7 @@ export default function Missions() {
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">ID Chauffeur</label>
-                  <input value={form.chauffeurId} onChange={e=>setForm({...form,chauffeurId:e.target.value})} placeholder="ID MongoDB du chauffeur" required/>
+                  <input value={form.chauffeurId} onChange={e=>setForm({...form,chauffeurId:e.target.value})} placeholder="ID du chauffeur" required/>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Client</label>
@@ -173,7 +288,7 @@ export default function Missions() {
               </div>
               <div className="form-group">
                 <label className="form-label">Adresse d'arrivée</label>
-                <input value={form.adresseArrivee} onChange={e=>setForm({...form,adresseArrivee:e.target.value})} placeholder="Ex: 5 avenue Victor Hugo, Marseille" required/>
+                <input value={form.adresseArrivee} onChange={e=>setForm({...form,adresseArrivee:e.target.value})} placeholder="Ex: 5 avenue Hugo, Marseille" required/>
               </div>
               <div className="form-row">
                 <div className="form-group">
@@ -187,13 +302,41 @@ export default function Missions() {
                   </select>
                 </div>
               </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Montant (€)</label>
+                  <input type="number" step="0.01" value={form.montant} onChange={e=>setForm({...form,montant:e.target.value})} placeholder="0.00"/>
+                </div>
+              </div>
               <div className="form-group">
                 <label className="form-label">Notes</label>
-                <textarea value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} rows={3} placeholder="Instructions particulières..."/>
+                <textarea value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} rows={2} placeholder="Instructions particulières..."/>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>Annuler</button>
                 <button type="submit" className="btn btn-primary">Créer la mission</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal refuser mission ──────────────────────────────────────────── */}
+      {refuserModal && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setRefuserModal(null)}>
+          <div className="modal">
+            <div className="modal-title">❌ Refuser la mission</div>
+            <form onSubmit={e => {
+              e.preventDefault();
+              handleRefuser(refuserModal);
+            }}>
+              <div className="form-group">
+                <label className="form-label">Raison du refus</label>
+                <textarea value={refuseForm.raison} onChange={e=>setRefuseForm({raison:e.target.value})} rows={3} placeholder="Expliquez pourquoi vous refusez cette mission..." required/>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-ghost" onClick={() => setRefuserModal(null)}>Annuler</button>
+                <button type="submit" className="btn btn-red">Refuser la mission</button>
               </div>
             </form>
           </div>
@@ -216,6 +359,14 @@ export default function Missions() {
                   <option value="accident">Accident</option>
                   <option value="retard">Retard</option>
                   <option value="autre">Autre</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Sévérité</label>
+                <select value={incForm.severity} onChange={e=>setIncForm({...incForm,severity:e.target.value})}>
+                  <option value="low">Faible</option>
+                  <option value="medium">Moyen</option>
+                  <option value="high">Élevée</option>
                 </select>
               </div>
               <div className="form-group">

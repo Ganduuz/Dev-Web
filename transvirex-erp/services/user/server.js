@@ -52,7 +52,7 @@ app.post("/register", async (req, res) => {
 
     const hashed = await bcrypt.hash(password, 10);
     const user   = await User.create({ nom, prenom, email, password: hashed, role });
-    res.status(201).json({ id: user._id, email: user.email, nom: user.nom, prenom: user.prenom, role: user.role });
+    res.status(201).json({ _id: user._id, email: user.email, nom: user.nom, prenom: user.prenom, role: user.role });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -69,7 +69,7 @@ app.post("/login", async (req, res) => {
     if (!valid) return res.status(401).json({ error: "Identifiants invalides" });
 
     const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
-    res.json({ token, user: { id: user._id, nom: user.nom, prenom: user.prenom, email: user.email, role: user.role } });
+    res.json({ token, user: { _id: user._id, nom: user.nom, prenom: user.prenom, email: user.email, role: user.role } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -92,7 +92,7 @@ app.get("/me", authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId).select("-password");
     if (!user) return res.status(404).json({ error: "Utilisateur non trouvé" });
-    res.json(user);
+    res.json({ _id: user._id, nom: user.nom, prenom: user.prenom, email: user.email, role: user.role, actif: user.actif });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
