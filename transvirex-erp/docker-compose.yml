@@ -43,10 +43,12 @@ services:
       - mongo
 
   facturation:
-    facturation:
+    build: ./services/facturation
     container_name: facturation
     ports:
       - "3004:3004"
+    depends_on:
+      - mongo
 
   notification:
     build: ./services/notification
