@@ -52,6 +52,9 @@ services:
 
   notification:
     build: ./services/notification
+    environment:
+    - MONGO_URL=mongodb://mongo:27017/erp
+    - RABBITMQ_URL=amqp://rabbitmq
     ports:
       - "3005:3005"
     depends_on:
@@ -73,3 +76,10 @@ services:
 
 volumes:
   mongodata:
+
+rabbitmq:
+  image: rabbitmq:3-management
+  ports:
+    - "5672:5672"
+    - "15672:15672"
+

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getMissions, createMission, updateStatut, assignerMission, signalerIncident, deleteMission } from "../services/api";
+import { getMissions, getDrivers, createMission, updateStatut, assignerMission, signalerIncident, deleteMission } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 
@@ -18,7 +18,9 @@ export default function Missions() {
   const { user } = useAuth();
   const [missions, setMissions]   = useState([]);
   const [historique, setHistorique] = useState([]);
-  const [chauffeurs, setChauffeurs] = useState([]); // Nouveau state pour les chauffeurs
+  const [drivers, setDrivers] = useState([]);
+  const [driverMap, setDriverMap] = useState({});
+  const [assignChoix, setAssignChoix] = useState({});
   const [loading,  setLoading]    = useState(true);
   const [tab, setTab] = useState("actives"); // actives, historique
   const [showModal,setShowModal]  = useState(false);
@@ -58,6 +60,16 @@ export default function Missions() {
       
       setMissions(missionsList);
       setHistorique(historiqueList);
+
+      if (isDispatcher) {
+        const driverRes = await getDrivers({ status: "Actif" });
+        setDrivers(driverRes.data);
+        setDriverMap(driverRes.data.reduce((acc, driver) => {
+          const key = driver.userId || driver._id;
+          acc[key] = `${driver.First_Name} ${driver.Last_Name}`;
+          return acc;
+        }, {}));
+      }
     } catch (err) {
       console.error(err);
       setMsg("Erreur lors du chargement");
@@ -66,23 +78,8 @@ export default function Missions() {
     }
   }
 
-  // Nouvelle fonction pour charger la liste des chauffeurs depuis l'API
-  async function loadChauffeurs() {
-    try {
-      // ⚠️ Assure-toi que cette route correspond à ton backend pour récupérer les utilisateurs "chauffeur"
-      const res = await axios.get(`${API_BASE}/users?role=chauffeur`, { headers });
-      setChauffeurs(res.data);
-    } catch (err) {
-      console.error("Erreur lors du chargement des chauffeurs", err);
-    }
-  }
-
   useEffect(() => { 
     load(); 
-    // Charger les chauffeurs uniquement si l'utilisateur est admin ou dispatcher
-    if (isDispatcher) {
-      loadChauffeurs();
-    }
   }, [filter, isChauffeur]);
 
   async function handleCreate(e) {
@@ -96,6 +93,24 @@ export default function Missions() {
       load();
     } catch (err) { 
       setMsg("Erreur : " + (err.response?.data?.error || err.message)); 
+    }
+  }
+
+  async function handleAssign(id) {
+    const chauffeurId = assignChoix[id];
+    if (!chauffeurId) {
+      setMsg("Sélectionnez un chauffeur avant d'assigner.");
+      setTimeout(() => setMsg(""), 3000);
+      return;
+    }
+    try {
+      await assignerMission(id, { chauffeurId });
+      setMsg("Chauffeur affecté ✅");
+      setTimeout(() => setMsg(""), 3000);
+      load();
+    } catch (err) {
+      setMsg("Erreur d'affectation");
+      setTimeout(() => setMsg(""), 3000);
     }
   }
 
@@ -225,6 +240,7 @@ export default function Missions() {
                   <tr>
                     <th>Référence</th>
                     <th>Client</th>
+                    <th>Chauffeur</th>
                     <th>Départ → Arrivée</th>
                     <th>Date</th>
                     <th>Statut</th>
@@ -238,6 +254,7 @@ export default function Missions() {
                     <tr key={m._id}>
                       <td><b>{m.reference}</b></td>
                       <td>{m.clientNom}</td>
+                      <td>{driverMap[m.chauffeurId] || m.chauffeurId || "—"}</td>
                       <td style={{fontSize:12,maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                         {m.adresseDepart?.split(',')[0]} → {m.adresseArrivee?.split(',')[0]}
                       </td>
@@ -266,12 +283,22 @@ export default function Missions() {
                           )}
                           {/* DISPATCHER ACTIONS */}
                           {isDispatcher && m.statut === "en_attente" && (
-                            <button className="btn btn-blue btn-sm" onClick={() => handleStatut(m._id,"assignee")}>📋 Assigner</button>
+                            <div style={{ display:"flex", gap:6, alignItems:"center", flexWrap:"wrap" }}>
+                              <select
+                                style={{padding:"4px 8px",fontSize:12,borderRadius:6,border:"1px solid var(--border)"}}
+                                value={assignChoix[m._id] || ""}
+                                onChange={e => setAssignChoix({...assignChoix, [m._id]: e.target.value})}
+                              >
+                                <option value="">Choisir un chauffeur</option>
+                                {drivers.map(d => (
+                                  <option key={d._id} value={d.userId || d._id}>{d.First_Name} {d.Last_Name} {d.Hub ? `(${d.Hub})` : ""}</option>
+                                ))}
+                              </select>
+                              <button className="btn btn-blue btn-sm" onClick={() => handleAssign(m._id)}>📋 Assigner</button>
+                            </div>
                           )}
-                          {isDispatcher && (
-                            <>
-                              <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(m._id)}>🗑</button>
-                            </>
+                          {isDispatcher && m.statut !== "en_attente" && (
+                            <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(m._id)}>🗑</button>
                           )}
                         </div>
                       </td>
@@ -295,11 +322,11 @@ export default function Missions() {
                   <label className="form-label">Chauffeur</label>
                   <select value={form.chauffeurId} onChange={e=>setForm({...form,chauffeurId:e.target.value})} required>
                     <option value="">-- Sélectionner un chauffeur --</option>
-                    {chauffeurs.map(c => (
-                      <option key={c._id} value={c._id}>
-                        {c.nom} {c.prenom}
+                    {drivers.length > 0 ? drivers.map(d => (
+                      <option key={d._id} value={d.userId || d._id}>
+                        {d.First_Name} {d.Last_Name} {d.Hub ? `(${d.Hub})` : ""}
                       </option>
-                    ))}
+                    )) : <option value="" disabled>Aucun chauffeur actif</option>}
                   </select>
                 </div>
                 <div className="form-group">

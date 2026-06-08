@@ -1,12 +1,28 @@
 const express  = require("express");
 const mongoose = require("mongoose");
 const jwt      = require("jsonwebtoken");
+const amqp     = require("amqplib");
 global.crypto  = require("crypto");
 
 const JWT_SECRET = process.env.JWT_SECRET || "transvirex_secret_2026";
+const RABBITMQ_URL = process.env.RABBITMQ_URL || "amqp://rabbitmq";
+const EVENT_EXCHANGE = "mission.events";
 
 const app = express();
 app.use(express.json());
+
+async function publishMissionEvent(type, payload) {
+  try {
+    const conn = await amqp.connect(RABBITMQ_URL);
+    const channel = await conn.createChannel();
+    await channel.assertExchange(EVENT_EXCHANGE, "fanout", { durable: false });
+    channel.publish(EVENT_EXCHANGE, "", Buffer.from(JSON.stringify({ type, payload })));
+    await channel.close();
+    await conn.close();
+  } catch (err) {
+    console.error("Erreur publication événement mission:", err);
+  }
+}
 
 const MONGO_URL ="mongodb://mongo:27017/erp";
 
@@ -102,6 +118,10 @@ app.post("/missions", authMiddleware, requireRole(["dispatcher","admin"]), async
   try {
     const mission = new Mission({ ...req.body, dispatcherId: req.user.userId });
     await mission.save();
+    await publishMissionEvent("MISSION_CREATED", mission);
+    if (mission.chauffeurId) {
+      await publishMissionEvent("MISSION_PROPOSAL", mission);
+    }
     res.status(201).json(mission);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -118,6 +138,11 @@ app.patch("/missions/:id/statut", authMiddleware, async (req, res) => {
     if (req.user.role === "chauffeur") query.chauffeurId = req.user.userId;
     const mission = await Mission.findOneAndUpdate(query, update, { new: true });
     if (!mission) return res.status(404).json({ error: "Mission non trouvée" });
+    if (statut === "livree") {
+      await publishMissionEvent("MISSION_DELIVERED", mission);
+    } else {
+      await publishMissionEvent("MISSION_STATUS_UPDATED", mission);
+    }
     res.json(mission);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -134,6 +159,7 @@ app.patch("/missions/:id/assigner", authMiddleware, requireRole(["dispatcher","a
       { new: true }
     );
     if (!mission) return res.status(404).json({ error: "Mission non trouvée" });
+    await publishMissionEvent("MISSION_PROPOSAL", mission);
     res.json(mission);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -183,6 +209,7 @@ app.patch("/missions/:id/terminer", authMiddleware, requireRole(["chauffeur"]), 
       { new: true }
     );
     if (!mission) return res.status(404).json({ error: "Mission non trouvée ou accès refusé" });
+    await publishMissionEvent("MISSION_DELIVERED", mission);
     res.json(mission);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -193,14 +220,16 @@ app.patch("/missions/:id/terminer", authMiddleware, requireRole(["chauffeur"]), 
 app.post("/missions/:id/incidents", authMiddleware, async (req, res) => {
   try {
     const { type, description } = req.body;
+    const incident = { type, description, date: new Date() };
     const query = { _id: req.params.id };
     if (req.user.role === "chauffeur") query.chauffeurId = req.user.userId;
     const mission = await Mission.findOneAndUpdate(
       query,
-      { statut: "incident", $push: { incidents: { type, description, date: new Date() } } },
+      { statut: "incident", $push: { incidents: incident } },
       { new: true }
     );
     if (!mission) return res.status(404).json({ error: "Mission non trouvée" });
+    await publishMissionEvent("MISSION_INCIDENT", { missionId: req.params.id, incident });
     res.json(mission);
   } catch (err) {
     res.status(500).json({ error: err.message });

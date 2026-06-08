@@ -28,12 +28,18 @@ export const assignerMission   = (id, d)  => API.patch(`/missions/${id}/assigner
 export const signalerIncident  = (id, d)  => API.post(`/missions/${id}/incidents`,   d);
 export const deleteMission     = (id)     => API.delete(`/missions/${id}`);
 
+// ── Drivers / Chauffeurs ──────────────────────────────────────────────────────────────────
+export const getDrivers       = (params) => API.get("/drivers", { params });
+export const getDriver        = (id)     => API.get(`/drivers/${id}`);
+
 // ── Tracking ──────────────────────────────────────────────────────────────────
 export const getTracking          = (params) => API.get("/tracking",                          { params });
 export const getTrackingMission   = (id)     => API.get(`/tracking/mission/${id}`);
 export const getTrackingChauffeur = (id)     => API.get(`/tracking/chauffeur/${id}/derniere`);
 export const addTracking          = (data)   => API.post("/tracking",                         data);
 export const getTrackingStats     = ()       => API.get("/tracking/stats");
+export const getKpiDashboard      = ()       => API.get("/kpi/dashboard");
+export const getKpiPerformanceByHub = ()     => API.get("/kpi/performance-par-hub");
 
 // ── Facturation ───────────────────────────────────────────────────────────────
 export const getFactures     = (params) => API.get("/facturation",              { params });
@@ -44,8 +50,10 @@ export const updateFactStatut= (id, s)  => API.patch(`/facturation/${id}/statut`
 export const addRelance      = (id, d)  => API.post(`/facturation/${id}/relances`, d);
 export const deleteFacture   = (id)     => API.delete(`/facturation/${id}`);
 
+export const getCompletedMissions = () => API.get("/missions", { params: { statut: "livree" } });
+
 // ── Notifications ─────────────────────────────────────────────────────────────
-export const getNotifications  = (userId) => API.get(`/notification/user/${userId}`);
+export const getNotifications  = (userId, role) => API.get(`/notification/user/${userId}`, { params: { role } });
 export const marquerLu         = (id)     => API.patch(`/notification/${id}/lire`);
-export const toutMarquerLu     = (userId) => API.patch(`/notification/user/${userId}/tout-lire`);
+export const toutMarquerLu     = (userId, role) => API.patch(`/notification/user/${userId}/tout-lire`, null, { params: { role } });
 export const createNotification= (data)   => API.post("/notification",            data);

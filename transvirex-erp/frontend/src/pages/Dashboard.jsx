@@ -135,6 +135,13 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="stat-card">
+              <div className="stat-icon red">⚠️</div>
+              <div>
+                <div className="stat-value">{factStats.enRetard?.montant?.toFixed(0) || 0}€</div>
+                <div className="stat-label">Factures en retard ({factStats.enRetard?.count})</div>
+              </div>
+            </div>
+            <div className="stat-card">
               <div className="stat-icon green">💰</div>
               <div>
                 <div className="stat-value">{factStats.payees?.montant?.toFixed(0) || 0}€</div>

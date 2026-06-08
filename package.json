@@ -21,5 +21,8 @@
     "autoprefixer": "^10.5.0",
     "postcss": "^8.5.15",
     "tailwindcss": "^4.3.0"
+  },
+  "dependencies": {
+    "amqplib": "^2.0.1"
   }
 }

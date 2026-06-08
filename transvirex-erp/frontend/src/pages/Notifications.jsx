@@ -14,7 +14,7 @@ export default function Notifications() {
     if (!user?._id) return;
     setLoading(true);
     try {
-      const res = await getNotifications(user._id);
+      const res = await getNotifications(user._id, user.role);
       setNotifs(res.data);
     } finally { setLoading(false); }
   }
@@ -27,7 +27,8 @@ export default function Notifications() {
 
   async function handleToutLire() {
     if (!user?._id) return;
-    await toutMarquerLu(user._id); load();
+    await toutMarquerLu(user._id, user.role);
+    load();
   }
 
   const nonLues = notifs.filter(n => !n.lu).length;

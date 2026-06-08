@@ -26,7 +26,11 @@ const forwardStrip = (prefix, serviceUrl) => async (req, res) => {
     res.status(response.status).json(response.data);
   } catch (err) {
     const status = err.response?.status || 500;
-    res.status(status).json({ error: err.response?.data || err.message });
+    const errorBody = err.response?.data;
+    const errorMessage = typeof errorBody === "object"
+      ? errorBody.error || JSON.stringify(errorBody)
+      : errorBody || err.message;
+    res.status(status).json({ error: errorMessage });
   }
 };
 

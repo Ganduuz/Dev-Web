@@ -55,6 +55,8 @@ app.get("/kpi/dashboard", async (req, res) => {
     // Revenue total factures
     const revenuTotal = invoices.reduce((s, i) => s + (i.Total_Amount || 0), 0);
     const revenuPaye  = invoices.filter(i => i.Status === "Payée").reduce((s, i) => s + (i.Total_Amount || 0), 0);
+    const facturesEnAttente = invoices.filter(i => i.Status === "En attente");
+    const facturesEnRetard = invoices.filter(i => i.Status === "en_retard" || i.Status === "En retard");
 
     // Incidents par type
     const incidentsByType = incidents.reduce((acc, i) => {
@@ -75,6 +77,30 @@ app.get("/kpi/dashboard", async (req, res) => {
         byHub,
         byPriorite,
       },
+      incidents: {
+        total: incidents.length,
+        byType: incidentsByType,
+        resolus: incidents.filter(i => i.Status === "Résolu").length,
+      },
+      facturation: {
+        revenuTotal,
+        revenuPaye,
+        factures: invoices.length,
+        enAttente: { count: facturesEnAttente.length, montant: facturesEnAttente.reduce((s, i) => s + (i.Total_Amount || 0), 0) },
+        enRetard: { count: facturesEnRetard.length, montant: facturesEnRetard.reduce((s, i) => s + (i.Total_Amount || 0), 0) },
+      },
+      chauffeurs: {
+        total: drivers.length,
+        actifs: drivers.filter(d => d.Status === "Actif").length,
+        byHub: driversByHub,
+        topRated: drivers.sort((a,b) => b.Rating - a.Rating).slice(0,3).map(d => ({
+          nom: `${d.First_Name} ${d.Last_Name}`,
+          rating: d.Rating,
+          hub: d.Hub,
+        })),
+      },
+      kpiHistorique: kpis,
+    });
       incidents: {
         total: incidents.length,
         byType: incidentsByType,
