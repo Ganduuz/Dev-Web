@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
-import { getTracking, addTracking, getTrackingStats } from "../services/api";
+// ⚠️ Ajout de getMissions ici
+import { getTracking, addTracking, getTrackingStats, getMissions } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
 export default function Tracking() {
   const { user } = useAuth();
   const [events,  setEvents]  = useState([]);
   const [stats,   setStats]   = useState(null);
+  const [missions, setMissions] = useState([]); // Nouveau state pour stocker les missions
   const [loading, setLoading] = useState(true);
   const [form,    setForm]    = useState({ missionId:"", chauffeurId:"", statut:"en_cours", message:"", localisation:{ adresse:"" } });
   const [msg,     setMsg]     = useState("");
@@ -13,9 +15,20 @@ export default function Tracking() {
   async function load() {
     setLoading(true);
     try {
-      const [e, s] = await Promise.all([getTracking(), getTrackingStats()]);
-      setEvents(e.data); setStats(s.data);
-    } finally { setLoading(false); }
+      // ⚠️ On charge les missions en même temps que les événements et les stats
+      const [e, s, m] = await Promise.all([
+        getTracking(), 
+        getTrackingStats(),
+        getMissions() // Appel à l'API pour récupérer les missions
+      ]);
+      setEvents(e.data); 
+      setStats(s.data);
+      setMissions(m.data); // Sauvegarde des missions dans le state
+    } catch (err) {
+      console.error("Erreur de chargement :", err);
+    } finally { 
+      setLoading(false); 
+    }
   }
 
   useEffect(() => { load(); }, []);
@@ -24,9 +37,12 @@ export default function Tracking() {
     e.preventDefault();
     try {
       await addTracking(form);
-      setMsg("Événement ajouté ✅"); load();
+      setMsg("Événement ajouté ✅"); 
+      load();
       setForm({ missionId:"", chauffeurId:"", statut:"en_cours", message:"", localisation:{ adresse:"" } });
-    } catch (err) { setMsg("Erreur : " + (err.response?.data?.error || err.message)); }
+    } catch (err) { 
+      setMsg("Erreur : " + (err.response?.data?.error || err.message)); 
+    }
   }
 
   const BADGE = { en_cours:"badge-amber", livree:"badge-green", incident:"badge-red", en_attente:"badge-gray" };
@@ -99,10 +115,20 @@ export default function Tracking() {
           <div className="card">
             <div className="card-title">Ajouter un événement</div>
             <form onSubmit={handleAdd}>
+              
+              {/* ── NOUVEAU SELECT POUR LA MISSION ── */}
               <div className="form-group">
-                <label className="form-label">ID Mission</label>
-                <input value={form.missionId} onChange={e=>setForm({...form,missionId:e.target.value})} placeholder="ID de la mission" required/>
+                <label className="form-label">Mission</label>
+                <select value={form.missionId} onChange={e=>setForm({...form,missionId:e.target.value})} required>
+                  <option value="">-- Sélectionner une mission --</option>
+                  {missions.map(m => (
+                    <option key={m._id} value={m._id}>
+                      {m.reference} - {m.clientNom}
+                    </option>
+                  ))}
+                </select>
               </div>
+
               <div className="form-group">
                 <label className="form-label">ID Chauffeur</label>
                 <input value={form.chauffeurId} onChange={e=>setForm({...form,chauffeurId:e.target.value})} placeholder="ID du chauffeur" required/>

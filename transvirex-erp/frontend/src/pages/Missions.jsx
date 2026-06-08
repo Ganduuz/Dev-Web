@@ -18,6 +18,7 @@ export default function Missions() {
   const { user } = useAuth();
   const [missions, setMissions]   = useState([]);
   const [historique, setHistorique] = useState([]);
+  const [chauffeurs, setChauffeurs] = useState([]); // Nouveau state pour les chauffeurs
   const [loading,  setLoading]    = useState(true);
   const [tab, setTab] = useState("actives"); // actives, historique
   const [showModal,setShowModal]  = useState(false);
@@ -65,7 +66,24 @@ export default function Missions() {
     }
   }
 
-  useEffect(() => { load(); }, [filter, isChauffeur]);
+  // Nouvelle fonction pour charger la liste des chauffeurs depuis l'API
+  async function loadChauffeurs() {
+    try {
+      // ⚠️ Assure-toi que cette route correspond à ton backend pour récupérer les utilisateurs "chauffeur"
+      const res = await axios.get(`${API_BASE}/users?role=chauffeur`, { headers });
+      setChauffeurs(res.data);
+    } catch (err) {
+      console.error("Erreur lors du chargement des chauffeurs", err);
+    }
+  }
+
+  useEffect(() => { 
+    load(); 
+    // Charger les chauffeurs uniquement si l'utilisateur est admin ou dispatcher
+    if (isDispatcher) {
+      loadChauffeurs();
+    }
+  }, [filter, isChauffeur]);
 
   async function handleCreate(e) {
     e.preventDefault();
@@ -274,8 +292,15 @@ export default function Missions() {
             <form onSubmit={handleCreate}>
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">ID Chauffeur</label>
-                  <input value={form.chauffeurId} onChange={e=>setForm({...form,chauffeurId:e.target.value})} placeholder="ID du chauffeur" required/>
+                  <label className="form-label">Chauffeur</label>
+                  <select value={form.chauffeurId} onChange={e=>setForm({...form,chauffeurId:e.target.value})} required>
+                    <option value="">-- Sélectionner un chauffeur --</option>
+                    {chauffeurs.map(c => (
+                      <option key={c._id} value={c._id}>
+                        {c.nom} {c.prenom}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Client</label>
