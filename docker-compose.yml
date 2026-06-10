@@ -5,6 +5,27 @@ services:
     container_name: mongo
     ports:
       - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  gateway:
+    build: ./gateway
+    ports:
+      - "3000:3000"
+    depends_on:
+      - user
+      - mission
+      - tracking
+      - facturation
+      - notification
+      - drivers
+      - kpi
 
   user:
     build: ./services/user
@@ -17,23 +38,50 @@ services:
     build: ./services/mission
     ports:
       - "3002:3002"
+    depends_on:
+      - mongo
 
   tracking:
     build: ./services/tracking
     ports:
       - "3003:3003"
+    depends_on:
+      - mongo
 
   facturation:
     build: ./services/facturation
+    container_name: facturation
     ports:
       - "3004:3004"
+    depends_on:
+      - mongo
+    volumes:
+      - archives_data:/archives
 
   notification:
     build: ./services/notification
+    environment:
+      - MONGO_URL=mongodb://mongo:27017/erp
+      - RABBITMQ_URL=amqp://rabbitmq
     ports:
       - "3005:3005"
+    depends_on:
+      - mongo
+      - rabbitmq
 
-  gateway:
-    build: ./gateway
+  drivers:
+    build: ./services/drivers
     ports:
-      - "3000:3000"
+      - "3006:3006"
+    depends_on:
+      - mongo
+
+  kpi:
+    build: ./services/kpi
+    ports:
+      - "3007:3007"
+    depends_on:
+      - mongo
+
+volumes:
+  mongodata:

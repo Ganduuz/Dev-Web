@@ -100,7 +100,7 @@ export default function Login() {
           <h1 style={{ margin: "10px 0", color: "#0b2c5e" }}>
             TRANSVIREX
           </h1>
-          <p style={{ color: "#333" }}>ERP Logistique — Connexion</p>
+          <p style={{ color: "#3f3e3e" }}>ERP Logistique — Connexion</p>
         </div>
 
         {/* ERROR */}

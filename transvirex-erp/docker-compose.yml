@@ -55,6 +55,8 @@ services:
       - "3004:3004"
     depends_on:
       - mongo
+    volumes:
+      - archives_data:/archives
 
   notification:
     build: ./services/notification
@@ -83,3 +85,4 @@ services:
 
 volumes:
   mongodata:
+  archives_data:

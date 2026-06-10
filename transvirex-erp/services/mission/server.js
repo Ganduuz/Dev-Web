@@ -76,6 +76,17 @@ function requireRole(roles) {
   };
 }
 
+function normalizeStatut(value) {
+  if (!value) return undefined;
+  return value
+    .toString()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+}
+
 // ── Modèle Mission ────────────────────────────────────────────────────────────
 const MissionSchema = new mongoose.Schema({
   reference:         { type: String, unique: true, sparse: true },
@@ -118,8 +129,14 @@ app.get("/missions", authMiddleware, async (req, res) => {
 
     const filter = {};
 
-    if (statut) filter.statut = statut;
-    if (priorite) filter.priorite = priorite;
+    if (statut) {
+      const normalizedStatut = normalizeStatut(statut);
+      if (normalizedStatut) filter.statut = normalizedStatut;
+    }
+    if (priorite) {
+      const normalizedPriorite = normalizeStatut(priorite);
+      if (normalizedPriorite) filter.priorite = normalizedPriorite;
+    }
 
     if (req.user.role === "chauffeur") {
       filter.chauffeurId = req.user.userId;
@@ -164,13 +181,14 @@ app.post("/missions", authMiddleware, requireRole(["dispatcher","admin"]), async
 app.patch("/missions/:id/statut", authMiddleware, async (req, res) => {
   try {
     const { statut } = req.body;
-    const update = { statut };
-    if (statut === "livree") update.dateLivraison = new Date();
+    const normalizedStatut = normalizeStatut(statut);
+    const update = { statut: normalizedStatut };
+    if (normalizedStatut === "livree") update.dateLivraison = new Date();
     const query = { _id: req.params.id };
     if (req.user.role === "chauffeur") query.chauffeurId = req.user.userId;
     const mission = await Mission.findOneAndUpdate(query, update, { new: true });
     if (!mission) return res.status(404).json({ error: "Mission non trouvée" });
-    if (statut === "livree") {
+    if (normalizedStatut === "livree") {
       publishMissionEvent("MISSION_DELIVERED", mission);
     } else {
       publishMissionEvent("MISSION_STATUS_UPDATED", mission);

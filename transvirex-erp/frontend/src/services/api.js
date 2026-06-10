@@ -48,8 +48,11 @@ export const getFactureStats = ()       => API.get("/facturation/stats");
 export const createFacture   = (data)   => API.post("/facturation",             data);
 export const updateFactStatut= (id, s)  => API.patch(`/facturation/${id}/statut`, { statut: s });
 export const addRelance      = (id, d)  => API.post(`/facturation/${id}/relances`, d);
-export const deleteFacture   = (id)     => API.delete(`/facturation/${id}`);
-
+export const deleteFacture   = (id)     => API.delete(`/facturation/${id}`);export const analyzeFactureData = (data) => API.post("/facturation/analyze", data);
+export const generateFacturePDF = (id) => API.post(`/facturation/${id}/generate-pdf`);
+export const downloadFacturePDF = (id) => API.get(`/facturation/${id}/download-pdf`, { responseType: "blob" });
+export const validateFacture = (id) => API.post(`/facturation/${id}/validate`);
+export const listArchivedPDFs = () => API.get("/facturation/pdfs/list");
 export const getCompletedMissions = () => API.get("/missions", { params: { statut: "livree" } });
 
 // ── Notifications ─────────────────────────────────────────────────────────────
