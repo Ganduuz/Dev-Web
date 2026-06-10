@@ -40,7 +40,7 @@ export default function Dashboard() {
   if (loading) return <div className="loading"><div className="spinner"/> Chargement...</div>;
 
   const isDirection = ["direction","admin"].includes(user?.role);
-
+  const isChauffeur = user?.role === "chauffeur";
   return (
     <div>
       <div className="topbar">
@@ -106,6 +106,8 @@ export default function Dashboard() {
         )}
 
         {/* ── Stats ERP temps réel ──────────────────────────────────────── */}
+        {!isChauffeur && (
+          <>
         <h3 style={{ fontFamily:"var(--font-head)", color:"var(--navy)", fontSize:14, marginBottom:12 }}>
           🚚 Missions — Temps réel
         </h3>
@@ -150,7 +152,8 @@ export default function Dashboard() {
             </div>
           </>}
         </div>
-
+  </>
+)}
         <div
   style={{
     display: "grid",
