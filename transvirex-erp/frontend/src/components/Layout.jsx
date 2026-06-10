@@ -1,5 +1,6 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useNotifs } from "../context/NotifContext";
 
 const NAV = [
   { to: "/",             icon: "📊", label: "Dashboard",     roles: null },
@@ -12,6 +13,7 @@ const NAV = [
 
 export default function Layout() {
   const { user, logoutUser } = useAuth();
+  const { nonLues } = useNotifs();
   const navigate = useNavigate();
 
   function handleLogout() {
@@ -25,7 +27,6 @@ export default function Layout() {
 
   return (
     <div className="app-layout">
-      {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside className="sidebar">
         <div className="sidebar-logo">
           <h1>TRANSVIREX</h1>
@@ -42,6 +43,20 @@ export default function Layout() {
             >
               <span className="nav-icon">{n.icon}</span>
               {n.label}
+              {n.to === "/notifications" && nonLues > 0 && (
+                <span style={{
+                  background: "var(--red)",
+                  color: "white",
+                  borderRadius: "50%",
+                  padding: "1px 7px",
+                  fontSize: 11,
+                  marginLeft: "auto",
+                  minWidth: 20,
+                  textAlign: "center",
+                }}>
+                  {nonLues}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -62,7 +77,6 @@ export default function Layout() {
         </div>
       </aside>
 
-      {/* ── Main ────────────────────────────────────────────────────────── */}
       <main className="main-content">
         <Outlet />
       </main>

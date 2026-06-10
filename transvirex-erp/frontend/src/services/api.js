@@ -27,7 +27,7 @@ export const updateStatut      = (id, s)  => API.patch(`/missions/${id}/statut`,
 export const assignerMission   = (id, d)  => API.patch(`/missions/${id}/assigner`,   d);
 export const signalerIncident  = (id, d)  => API.post(`/missions/${id}/incidents`,   d);
 export const deleteMission     = (id)     => API.delete(`/missions/${id}`);
-
+export const terminerMission = (id) => API.patch(`/missions/${id}/terminer`, {});
 // ── Drivers / Chauffeurs ──────────────────────────────────────────────────────────────────
 export const getDrivers       = (params) => API.get("/drivers", { params });
 export const getDriver        = (id)     => API.get(`/drivers/${id}`);

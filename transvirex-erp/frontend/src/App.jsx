@@ -6,12 +6,24 @@ import Layout        from "./components/Layout";
 import Dashboard     from "./pages/Dashboard";
 import Missions      from "./pages/Missions";
 import Tracking      from "./pages/Tracking";
-import Facturation   from "./pages/Facturation";
+import Facturation   from "./pages/FacturationEnhanced";
 import Users         from "./pages/Users";
 import Notifications from "./pages/Notifications";
 import Drivers       from "./pages/Drivers";
 import Direction     from "./pages/Direction";
+import { NotifProvider } from "./context/NotifContext";
 
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <NotifProvider>
+          <AppRoutes />
+        </NotifProvider>
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}
 function PrivateRoute({ children, roles }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="loading"><div className="spinner"/></div>;
@@ -48,12 +60,3 @@ function AppRoutes() {
   );
 }
 
-export default function App() {
-  return (
-    <AuthProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </AuthProvider>
-  );
-}

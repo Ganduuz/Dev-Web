@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
 import { getNotifications, marquerLu, toutMarquerLu } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { useNotifs } from "../context/NotifContext";
 
 const TYPE_BADGE = { info:"badge-blue", alerte:"badge-red", succes:"badge-green", erreur:"badge-red" };
 const TYPE_ICON  = { info:"ℹ️", alerte:"⚠️", succes:"✅", erreur:"❌" };
 
 export default function Notifications() {
-  const { user }  = useAuth();
-  const [notifs,   setNotifs]  = useState([]);
-  const [loading,  setLoading] = useState(true);
+  const { user } = useAuth();
+  const { refreshNotifs } = useNotifs();
+  const [notifs, setNotifs] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   async function load() {
     if (!user?._id) return;
@@ -16,13 +18,15 @@ export default function Notifications() {
     try {
       const res = await getNotifications(user._id, user.role);
       setNotifs(res.data);
+      refreshNotifs();
     } finally { setLoading(false); }
   }
 
   useEffect(() => { load(); }, [user]);
 
   async function handleLu(id) {
-    await marquerLu(id); load();
+    await marquerLu(id);
+    load();
   }
 
   async function handleToutLire() {
@@ -36,7 +40,14 @@ export default function Notifications() {
   return (
     <div>
       <div className="topbar">
-        <span className="topbar-title">🔔 Notifications {nonLues > 0 && <span style={{background:"var(--red)",color:"white",borderRadius:"50%",padding:"1px 7px",fontSize:12,marginLeft:8}}>{nonLues}</span>}</span>
+        <span className="topbar-title">
+          🔔 Notifications
+          {nonLues > 0 && (
+            <span style={{background:"var(--red)",color:"white",borderRadius:"50%",padding:"1px 7px",fontSize:12,marginLeft:8}}>
+              {nonLues}
+            </span>
+          )}
+        </span>
         <div className="topbar-actions">
           {nonLues > 0 && (
             <button className="btn btn-ghost" onClick={handleToutLire}>✓ Tout marquer comme lu</button>

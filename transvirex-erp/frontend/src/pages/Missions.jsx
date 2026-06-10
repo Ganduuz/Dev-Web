@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
-import { getMissions, getDrivers, getUsers, createMission, updateStatut, assignerMission, signalerIncident, deleteMission, getTracking, getTrackingMission } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 
-const API_BASE = "http://localhost:3002";
+import { getMissions, getDrivers, getUsers, createMission, updateStatut, assignerMission, signalerIncident, deleteMission, getTracking, getTrackingMission, terminerMission } from "../services/api";
 
 const STATUTS = ["en_attente","acceptee","assignee","en_cours","livree","incident","annulee"];
 const PRIORITES = ["basse","normale","haute","urgente"];
@@ -224,17 +223,19 @@ export default function Missions() {
     }
   }
 
-  async function handleTerminer(id) {
-    try {
-      await axios.patch(`${API_BASE}/missions/${id}/terminer`, {}, { headers });
-      setMsg("Livraison terminée ✅");
-      setTimeout(() => setMsg(""), 3000);
-      load();
-    } catch (err) {
-      setMsg("Erreur : " + (err.response?.data?.error || err.message));
-    }
-  }
+// Ajoute l'import en haut
 
+// Remplace handleTerminer
+async function handleTerminer(id) {
+  try {
+    await terminerMission(id);
+    setMsg("Livraison terminée ✅");
+    setTimeout(() => setMsg(""), 3000);
+    load();
+  } catch (err) {
+    setMsg("Erreur : " + (err.response?.data?.error || err.message));
+  }
+}
   async function handleIncident(e) {
     e.preventDefault();
     try {
@@ -291,15 +292,15 @@ export default function Missions() {
             {/* CHAUFFEUR ACTIONS */}
             {isChauffeur && m.statut === "assignee" && (
               <>
-                <button className="btn btn-green btn-sm" onClick={() => handleAccepter(m._id)}>✅ Accepter</button>
-                <button className="btn btn-red btn-sm" onClick={() => setRefuserModal(m._id)}>❌ Refuser</button>
+                <button className="btn btn-green btn-sm" onClick={() => handleAccepter(m._id)}> Accepter</button>
+                <button className="btn btn-red btn-sm" onClick={() => setRefuserModal(m._id)}> Refuser</button>
               </>
             )}
             {isChauffeur && m.statut === "acceptee" && (
               <button className="btn btn-amber btn-sm" onClick={() => handleStatut(m._id,"en_cours")}>▶ Démarrer</button>
             )}
             {isChauffeur && m.statut === "en_cours" && (
-              <button className="btn btn-green btn-sm" onClick={() => handleTerminer(m._id)}>✅ Terminer</button>
+              <button className="btn btn-green btn-sm" onClick={() => handleTerminer(m._id)}> Terminer</button>
             )}
             {/* INCIDENT */}
             {['chauffeur','dispatcher','admin'].includes(role) && !['livree','annulee','refusee'].includes(m.statut) && (
