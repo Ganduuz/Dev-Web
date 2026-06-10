@@ -1,6 +1,7 @@
 const express = require("express");
 const axios   = require("axios");
 global.crypto = require("crypto");
+const http = require("http");
 
 const app = express();
 app.use(express.json());
@@ -36,27 +37,62 @@ const forwardStrip = (prefix, serviceUrl) => async (req, res) => {
 };
 
 // Garde le chemin complet
+// Remplace forwardFull par cette version améliorée
 const forwardFull = (serviceUrl) => async (req, res) => {
   try {
+    const isDownload = req.originalUrl.includes("/download-pdf");
     const response = await axios({
       method:  req.method,
       url:     serviceUrl + req.originalUrl,
       data:    req.body,
       headers: { ...req.headers, Authorization: req.headers.authorization || "" },
+      responseType: isDownload ? "arraybuffer" : "json",
     });
+
+    if (isDownload) {
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", response.headers["content-disposition"] || "attachment");
+      return res.status(response.status).send(Buffer.from(response.data));
+    }
+
     res.status(response.status).json(response.data);
+
   } catch (err) {
     const status = err.response?.status || 500;
-    res.status(status).json({ error: err.response?.data || err.message });
+    const data = err.response?.data;
+
+    let errorMsg;
+    if (data instanceof ArrayBuffer || Buffer.isBuffer(data)) {
+      try { errorMsg = JSON.parse(Buffer.from(data).toString()).error; }
+      catch { errorMsg = "Erreur serveur"; }
+    } else if (typeof data === "object" && data !== null) {
+      errorMsg = data.error || JSON.stringify(data);
+    } else {
+      errorMsg = data || err.message;
+    }
+
+    res.status(status).json({ error: errorMsg });
   }
 };
-
 app.get("/", (req, res) => res.json({ message: "Transvirex Gateway 🚀", version: "2.0.0" }));
-
+app.get("/facturation/:id/download-pdf", (req, res) => {
+  const url = `http://facturation:3004${req.originalUrl}`;
+  http.get(url, { headers: { authorization: req.headers.authorization || "" } }, (proxyRes) => {
+    if (proxyRes.statusCode === 404) {
+      return res.status(404).json({ error: "PDF non trouvé" });
+    }
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", proxyRes.headers["content-disposition"] || `attachment; filename="facture.pdf"`);
+    res.status(proxyRes.statusCode);
+    proxyRes.pipe(res);
+  }).on("error", (err) => {
+    res.status(500).json({ error: err.message });
+  });
+});
 app.use("/users",        forwardStrip("/users",   "http://user:3001"));
 app.use("/missions",     forwardFull("http://mission:3002"));
 app.use("/tracking",     forwardFull("http://tracking:3003"));
-app.use("/facturation",  forwardFull("http://facturation:3004"));
+app.use("/facturation", forwardFull("http://facturation:3004"));
 app.use("/notification", forwardFull("http://notification:3005"));
 app.use("/drivers",      forwardFull("http://drivers:3006"));
 app.use("/kpi",          forwardFull("http://kpi:3007"));
