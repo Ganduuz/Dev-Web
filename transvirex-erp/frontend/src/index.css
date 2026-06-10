@@ -1,17 +1,19 @@
 ﻿/* ── Variables ──────────────────────────────────────────────────────────────── */
 :root {
-  --navy:      #232a4f;
-  --indigo:    #466cff;
-  --blue:      #5f8dff;
-  --teal:      #16a085;
-  --teal-soft: #dcf3ee;
-  --amber:     #f59e0b;
-  --red:       #ef4444;
-  --gray:      #64748b;
-  --gray-light:#f0f3f9;
-  --white:     #ffffff;
-  --text:      #1f2937;
-  --border:    rgba(99, 102, 241, 0.15);
+  --navy:      #6d0a81;
+  --blue:      #be91be;
+  --blue-light:#E6F1FB;
+  --accent:    #1D9E75;
+  --accent-l:  #E1F5EE;
+  --amber:     #BA7517;
+  --amber-l:   #FAEEDA;
+  --red:       #C0392B;
+  --red-l:     #FDECEB;
+  --gray:      #5F5E5A;
+  --gray-l:    #F5F4F0;
+  --white:     #FFFFFF;
+  --text:      #1A1A18;
+  --border:    #E2E0D8;
   --shadow:    0 20px 60px rgba(15, 23, 42, 0.08);
   --shadow-soft: 0 12px 30px rgba(15, 23, 42, 0.08);
   --radius:    20px;
@@ -71,8 +73,8 @@ input:focus, select:focus, textarea:focus {
 }
 
 .sidebar {
-  width: 240px;
-  background: linear-gradient(180deg, rgba(35, 42, 79, 0.98), rgba(38, 47, 94, 0.98));
+  width: 260px;
+  background: linear-gradient(180deg, rgba(173, 44, 177, 0.98), rgba(38, 47, 94, 0.98));
   color: white;
   display: flex;
   flex-direction: column;
@@ -83,10 +85,9 @@ input:focus, select:focus, textarea:focus {
   z-index: 100;
   padding: 24px 16px;
 }
-
 .sidebar-logo {
   padding-bottom: 22px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid rgba(86, 22, 22, 0.08);
 }
 
 .sidebar-logo h1 {
@@ -409,4 +410,135 @@ tbody tr:hover { background: rgba(70, 108, 255, 0.06); }
   .topbar { padding: 0 16px; }
   .card, .stat-card, .modal, .login-box { padding: 22px; }
   .sidebar-nav { gap: 4px; }
+}
+
+
+
+/* ───────────────────────────────────────────── */
+/*           RESPONSIVE MISSIONS TABLE           */
+/* ───────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  table {
+    min-width: 850px;
+  }
+
+  .topbar-actions {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 768px) {
+
+  /* Topbar devient vertical */
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Table scroll propre */
+  .table-wrap {
+    overflow-x: auto;
+  }
+
+  table {
+    min-width: 750px;
+  }
+
+  th, td {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  /* Actions boutons empilés */
+  td div {
+    flex-wrap: wrap !important;
+    gap: 6px;
+  }
+
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Formulaire modal */
+  .form-row {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+
+  /* Table encore plus compacte */
+  table {
+    min-width: 600px;
+  }
+
+  th {
+    font-size: 10px;
+  }
+
+  td {
+    font-size: 11px;
+  }
+
+  /* Badges plus petits */
+  .badge {
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+
+  /* Modal full screen mobile */
+  .modal {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    padding: 18px;
+  }
+
+  .modal-footer {
+    flex-direction: column;
+  }
+
+  .modal-footer .btn {
+    width: 100%;
+  }
+}
+
+
+/* ACTIONS FLEX PROPRE */
+.mission-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+/* TRACKING BLOCK */
+.tracking-cell {
+  min-width: 160px;
+}
+
+/* TABLE FIX MOBILE */
+@media (max-width: 768px) {
+  .mission-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tracking-cell {
+    min-width: auto;
+  }
+
+  td {
+    white-space: normal !important;
+  }
 }

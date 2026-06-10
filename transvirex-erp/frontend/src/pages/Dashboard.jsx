@@ -151,7 +151,17 @@ export default function Dashboard() {
           </>}
         </div>
 
-        <div style={{ display:"grid", gridTemplateColumns: isDirection ? "1fr 1fr" : "1fr", gap:20 }}>
+        <div
+  style={{
+    display: "grid",
+    gridTemplateColumns: window.innerWidth < 768
+      ? "1fr"
+      : isDirection
+        ? "1fr 1fr"
+        : "1fr",
+    gap: 20
+  }}
+>
           {/* ── Missions récentes ──────────────────────────────────────── */}
           <div className="card">
             <div className="card-title">📋 Missions récentes</div>

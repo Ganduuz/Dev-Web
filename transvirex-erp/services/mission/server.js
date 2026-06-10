@@ -114,19 +114,24 @@ const Mission = mongoose.model("Mission", MissionSchema);
 // ── GET /missions ─────────────────────────────────────────────────────────────
 app.get("/missions", authMiddleware, async (req, res) => {
   try {
-    const { statut, chauffeurId, priorite } = req.query;
+    const { statut, priorite } = req.query;
+
     const filter = {};
-    if (statut)      filter.statut      = statut;
-    if (chauffeurId) filter.chauffeurId = chauffeurId;
-    if (priorite)    filter.priorite    = priorite;
-    if (req.user.role === "chauffeur") filter.chauffeurId = req.user.userId;
+
+    if (statut) filter.statut = statut;
+    if (priorite) filter.priorite = priorite;
+
+    if (req.user.role === "chauffeur") {
+      filter.chauffeurId = req.user.userId;
+    }
+
     const missions = await Mission.find(filter).sort({ dateDepart: 1 });
+
     res.json(missions);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
-
 // ── GET /missions/:id ─────────────────────────────────────────────────────────
 app.get("/missions/:id", authMiddleware, async (req, res) => {
   try {

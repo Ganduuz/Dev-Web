@@ -3,7 +3,7 @@ import { getMissions, getDrivers, getUsers, createMission, updateStatut, assigne
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 
-const API_BASE = "http://localhost:3000";
+const API_BASE = "http://localhost:3002";
 
 const STATUTS = ["en_attente","acceptee","assignee","en_cours","livree","incident","annulee"];
 const PRIORITES = ["basse","normale","haute","urgente"];
@@ -202,7 +202,7 @@ export default function Missions() {
 
   async function handleAccepter(id) {
     try {
-      await axios.patch(`${API_BASE}/missions/${id}/accepter`, {}, { headers });
+      await updateStatut(id, "acceptee");
       setMsg("Mission acceptée ✅");
       setTimeout(() => setMsg(""), 3000);
       load();
@@ -276,7 +276,7 @@ export default function Missions() {
         <td><span className={`badge ${BADGE[m.statut]}`}>{m.statut}</span></td>
         <td><span className={`badge ${PBADGE[m.priorite]}`}>{m.priorite}</span></td>
         <td style={{minWidth:180}}>
-          <div style={{display:'grid',gap:4}}>
+          <div className="mission-actions">
             <span className={`badge ${BADGE[lastEvent?.statut] || 'badge-gray'}`}>
               {lastEvent?.statut || 'Aucun suivi'}
             </span>
