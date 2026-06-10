@@ -4,6 +4,7 @@ global.crypto = require("crypto");
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin",  "*");
@@ -21,7 +22,7 @@ const forwardStrip = (prefix, serviceUrl) => async (req, res) => {
       method:  req.method,
       url:     serviceUrl + path,
       data:    req.body,
-      headers: { Authorization: req.headers.authorization || "" },
+      headers: { ...req.headers, Authorization: req.headers.authorization || "" },
     });
     res.status(response.status).json(response.data);
   } catch (err) {
@@ -41,7 +42,7 @@ const forwardFull = (serviceUrl) => async (req, res) => {
       method:  req.method,
       url:     serviceUrl + req.originalUrl,
       data:    req.body,
-      headers: { Authorization: req.headers.authorization || "" },
+      headers: { ...req.headers, Authorization: req.headers.authorization || "" },
     });
     res.status(response.status).json(response.data);
   } catch (err) {

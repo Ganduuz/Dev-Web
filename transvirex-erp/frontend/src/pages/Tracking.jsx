@@ -9,7 +9,7 @@ export default function Tracking() {
   const [stats,   setStats]   = useState(null);
   const [missions, setMissions] = useState([]); // Nouveau state pour stocker les missions
   const [loading, setLoading] = useState(true);
-  const [form,    setForm]    = useState({ missionId:"", chauffeurId:"", statut:"en_cours", message:"", localisation:{ adresse:"" } });
+  const [form,    setForm]    = useState({ missionId:"", statut:"en_cours", message:"", localisation:{ adresse:"" } });
   const [msg,     setMsg]     = useState("");
 
   async function load() {
@@ -35,13 +35,32 @@ export default function Tracking() {
 
   async function handleAdd(e) {
     e.preventDefault();
+    const mission = missions.find(m => m._id === form.missionId);
+    if (!mission) {
+      setMsg("Sélectionnez une mission avant d'ajouter un événement.");
+      return;
+    }
+    if (!mission.chauffeurId) {
+      setMsg("La mission sélectionnée n'a pas encore de chauffeur assigné.");
+      return;
+    }
+
     try {
-      await addTracking(form);
-      setMsg("Événement ajouté ✅"); 
+      const payload = {
+        missionId: mission._id,
+        chauffeurId: mission.chauffeurId,
+        statut: form.statut,
+        localisation: form.localisation,
+        message: form.message,
+      };
+      await addTracking(payload);
+      setMsg("Événement ajouté ✅");
       load();
-      setForm({ missionId:"", chauffeurId:"", statut:"en_cours", message:"", localisation:{ adresse:"" } });
-    } catch (err) { 
-      setMsg("Erreur : " + (err.response?.data?.error || err.message)); 
+      setForm({ missionId:"", statut:"en_cours", message:"", localisation:{ adresse:"" } });
+    } catch (err) {
+      const errorBody = err.response?.data;
+      const errorText = typeof errorBody === "object" ? JSON.stringify(errorBody) : errorBody;
+      setMsg("Erreur : " + (err.response?.data?.error || errorText || err.message));
     }
   }
 
@@ -129,10 +148,6 @@ export default function Tracking() {
                 </select>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">ID Chauffeur</label>
-                <input value={form.chauffeurId} onChange={e=>setForm({...form,chauffeurId:e.target.value})} placeholder="ID du chauffeur" required/>
-              </div>
               <div className="form-group">
                 <label className="form-label">Statut</label>
                 <select value={form.statut} onChange={e=>setForm({...form,statut:e.target.value})}>

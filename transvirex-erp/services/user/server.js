@@ -78,8 +78,10 @@ app.post("/login", async (req, res) => {
 // ── GET / — liste tous les users ──────────────────────────────────────────────
 app.get("/", authMiddleware, async (req, res) => {
   try {
-    const { role } = req.query;
-    const filter = role ? { role } : {};
+    const { role, actif } = req.query;
+    const filter = {};
+    if (role) filter.role = role;
+    if (actif !== undefined) filter.actif = actif === "true";
     const users = await User.find(filter).select("-password").sort({ createdAt: -1 });
     res.json(users);
   } catch (err) {

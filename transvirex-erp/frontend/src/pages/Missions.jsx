@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getMissions, getDrivers, createMission, updateStatut, assignerMission, signalerIncident, deleteMission } from "../services/api";
+import { getMissions, getDrivers, getUsers, createMission, updateStatut, assignerMission, signalerIncident, deleteMission, getTracking, getTrackingMission } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 
@@ -21,6 +21,10 @@ export default function Missions() {
   const [drivers, setDrivers] = useState([]);
   const [driverMap, setDriverMap] = useState({});
   const [assignChoix, setAssignChoix] = useState({});
+  const [trackingSummary, setTrackingSummary] = useState({});
+  const [selectedMission, setSelectedMission] = useState(null);
+  const [selectedTracking, setSelectedTracking] = useState([]);
+  const [loadingTracking, setLoadingTracking] = useState(false);
   const [loading,  setLoading]    = useState(true);
   const [tab, setTab] = useState("actives"); // actives, historique
   const [showModal,setShowModal]  = useState(false);
@@ -32,13 +36,15 @@ export default function Missions() {
   const [refuseForm, setRefuseForm] = useState({ raison: "" });
   const [msg,      setMsg]        = useState("");
 
-  const isChauffeur = user?.role === "chauffeur";
-  const isDispatcher = ["dispatcher","admin"].includes(user?.role);
-  const isDirection = ["direction","admin"].includes(user?.role);
+  const role = user?.role?.toLowerCase?.() || "";
+  const isChauffeur = role === "chauffeur";
+  const isDispatcher = ["dispatcher","admin"].includes(role);
+  const isDirection = ["direction","admin"].includes(role);
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
 
   async function load() {
+    if (!user) return;
     setLoading(true);
     try {
       const params = {};
@@ -48,31 +54,84 @@ export default function Missions() {
       let missionsList = [];
       let historiqueList = [];
 
-      // Charger missions actuelles
+      const missionsPromise = getMissions(params);
+      const trackingPromise = getTracking().catch(err => {
+        console.warn("Impossible de charger le tracking", err);
+        return { data: [] };
+      });
+      const [missionsRes, trackingRes] = await Promise.all([missionsPromise, trackingPromise]);
+      const allTracking = trackingRes.data || [];
+      const summary = {};
+      allTracking.forEach(event => {
+        const current = summary[event.missionId];
+        if (!current || new Date(event.createdAt) > new Date(current.createdAt)) {
+          summary[event.missionId] = event;
+        }
+      });
+
       if (isChauffeur) {
-        const res = await getMissions(params);
-        missionsList = res.data.filter(m => !["livree","incident","annulee"].includes(m.statut));
-        historiqueList = res.data.filter(m => ["livree","incident","annulee"].includes(m.statut));
+        missionsList = missionsRes.data.filter(m => !["livree","incident","annulee"].includes(m.statut));
+        historiqueList = missionsRes.data.filter(m => ["livree","incident","annulee"].includes(m.statut));
       } else {
-        const res = await getMissions(params);
-        missionsList = res.data;
+        missionsList = missionsRes.data;
       }
       
       setMissions(missionsList);
       setHistorique(historiqueList);
+      setTrackingSummary(summary);
 
       if (isDispatcher) {
-        const driverRes = await getDrivers({ status: "Actif" });
-        setDrivers(driverRes.data);
-        setDriverMap(driverRes.data.reduce((acc, driver) => {
-          const key = driver.userId || driver._id;
-          acc[key] = `${driver.First_Name} ${driver.Last_Name}`;
-          return acc;
-        }, {}));
+        try {
+          let driverData = [];
+
+          const driverRes = await getDrivers({ status: "Actif" });
+          if (driverRes.data?.length > 0) {
+            driverData = driverRes.data;
+          } else {
+            const fallbackDrivers = await getDrivers();
+            if (fallbackDrivers.data?.length > 0) {
+              driverData = fallbackDrivers.data;
+            } else {
+              const userRes = await getUsers({ role: "chauffeur", actif: true });
+              driverData = userRes.data
+                .filter(user => user.role === "chauffeur")
+                .map(user => ({
+                  _id: user._id,
+                  userId: user._id,
+                  First_Name: user.prenom,
+                  Last_Name: user.nom,
+                  Hub: user.hub || "",
+                }));
+            }
+          }
+
+          driverData = driverData
+            .filter(driver => driver.role === "chauffeur" || driver.role === undefined)
+            .map(driver => ({
+              ...driver,
+              role: driver.role || "chauffeur",
+              userId: driver.userId || driver._id,
+              First_Name: driver.First_Name || driver.prenom || "",
+              Last_Name: driver.Last_Name || driver.nom || "",
+              Hub: driver.Hub || driver.hub || "",
+            }));
+
+          setDrivers(driverData);
+          setDriverMap(driverData.reduce((acc, driver) => {
+            const key = driver.userId || driver._id;
+            acc[key] = `${driver.First_Name || ""} ${driver.Last_Name || ""}`.trim();
+            return acc;
+          }, {}));
+        } catch (driverErr) {
+          console.error("Erreur chargement chauffeurs", driverErr);
+          setDrivers([]);
+          setDriverMap({});
+          setMsg("Liste des chauffeurs indisponible");
+        }
       }
     } catch (err) {
       console.error(err);
-      setMsg("Erreur lors du chargement");
+      setMsg("Erreur lors du chargement : " + (err.response?.data?.error || err.message));
     } finally { 
       setLoading(false); 
     }
@@ -80,7 +139,7 @@ export default function Missions() {
 
   useEffect(() => { 
     load(); 
-  }, [filter, isChauffeur]);
+  }, [filter, role]);
 
   async function handleCreate(e) {
     e.preventDefault();
@@ -111,6 +170,22 @@ export default function Missions() {
     } catch (err) {
       setMsg("Erreur d'affectation");
       setTimeout(() => setMsg(""), 3000);
+    }
+  }
+
+  async function handleShowTracking(mission) {
+    setSelectedMission(mission);
+    setLoadingTracking(true);
+    try {
+      const res = await getTrackingMission(mission._id);
+      setSelectedTracking(res.data);
+    } catch (err) {
+      console.error("Erreur chargement tracking", err);
+      setSelectedTracking([]);
+      setMsg("Impossible de charger le suivi de mission.");
+      setTimeout(() => setMsg(""), 3000);
+    } finally {
+      setLoadingTracking(false);
     }
   }
 
@@ -169,8 +244,9 @@ export default function Missions() {
       setMsg("Incident signalé");
       setTimeout(() => setMsg(""), 3000);
       load();
-    } catch (err) { 
-      setMsg("Erreur : " + (err.response?.data?.error || err.message));
+    } catch (err) {
+      const errorValue = err.response?.data?.error || err.response?.data || err.message;
+      setMsg("Erreur : " + (typeof errorValue === "string" ? errorValue : JSON.stringify(errorValue)));
     }
   }
 
@@ -185,6 +261,78 @@ export default function Missions() {
   }
 
   const displayMissions = tab === "actives" ? missions : historique;
+
+  const missionRows = displayMissions.map(m => {
+    const lastEvent = trackingSummary[m._id];
+    return (
+      <tr key={m._id}>
+        <td><b>{m.reference}</b></td>
+        <td>{m.clientNom}</td>
+        <td>{driverMap[m.chauffeurId] || m.chauffeurId || "—"}</td>
+        <td style={{fontSize:12,maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+          {m.adresseDepart?.split(',')[0]} → {m.adresseArrivee?.split(',')[0]}
+        </td>
+        <td>{new Date(m.dateDepart).toLocaleDateString("fr-FR", {year:'2-digit',month:'2-digit',day:'2-digit'})}</td>
+        <td><span className={`badge ${BADGE[m.statut]}`}>{m.statut}</span></td>
+        <td><span className={`badge ${PBADGE[m.priorite]}`}>{m.priorite}</span></td>
+        <td style={{minWidth:180}}>
+          <div style={{display:'grid',gap:4}}>
+            <span className={`badge ${BADGE[lastEvent?.statut] || 'badge-gray'}`}>
+              {lastEvent?.statut || 'Aucun suivi'}
+            </span>
+            <span className="text-muted" style={{fontSize:12,whiteSpace:'normal'}}>
+              {lastEvent?.localisation?.adresse || 'Aucune localisation'}
+            </span>
+          </div>
+        </td>
+        {!isChauffeur && <td>{m.montant || 0}€</td>}
+        <td>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",fontSize:12}}>
+            {/* CHAUFFEUR ACTIONS */}
+            {isChauffeur && m.statut === "assignee" && (
+              <>
+                <button className="btn btn-green btn-sm" onClick={() => handleAccepter(m._id)}>✅ Accepter</button>
+                <button className="btn btn-red btn-sm" onClick={() => setRefuserModal(m._id)}>❌ Refuser</button>
+              </>
+            )}
+            {isChauffeur && m.statut === "acceptee" && (
+              <button className="btn btn-amber btn-sm" onClick={() => handleStatut(m._id,"en_cours")}>▶ Démarrer</button>
+            )}
+            {isChauffeur && m.statut === "en_cours" && (
+              <button className="btn btn-green btn-sm" onClick={() => handleTerminer(m._id)}>✅ Terminer</button>
+            )}
+            {/* INCIDENT */}
+            {['chauffeur','dispatcher','admin'].includes(role) && !['livree','annulee','refusee'].includes(m.statut) && (
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowInc(m._id)}>⚠️ Incident</button>
+            )}
+            <button className="btn btn-ghost btn-sm" onClick={() => handleShowTracking(m)}>📍 Suivi</button>
+            {/* DISPATCHER ACTIONS */}
+            {isDispatcher && m.statut === "en_attente" && (
+              <div style={{ display:"flex", gap:6, alignItems:"center", flexWrap:"wrap" }}>
+                <select
+                  style={{padding:"4px 8px",fontSize:12,borderRadius:6,border:"1px solid var(--border)"}}
+                  value={assignChoix[m._id] || ""}
+                  onChange={e => setAssignChoix({...assignChoix, [m._id]: e.target.value})}
+                >
+                  <option value="">Choisir un chauffeur</option>
+                  {drivers.map(d => {
+                    const name = d.First_Name || d.firstName || d.Last_Name || d.lastName || d.name || d.Driver_ID || "Chauffeur";
+                    return (
+                      <option key={d._id} value={d.userId || d._id}>{`${name}${d.Hub ? ` (${d.Hub})` : ""}`}</option>
+                    );
+                  })}
+                </select>
+                <button className="btn btn-blue btn-sm" onClick={() => handleAssign(m._id)}>📋 Assigner</button>
+              </div>
+            )}
+            {isDispatcher && m.statut !== "en_attente" && (
+              <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(m._id)}>🗑</button>
+            )}
+          </div>
+        </td>
+      </tr>
+    );
+  });
 
   return (
     <div>
@@ -245,65 +393,13 @@ export default function Missions() {
                     <th>Date</th>
                     <th>Statut</th>
                     <th>Priorité</th>
+                    <th>Tracking</th>
                     {!isChauffeur && <th>Montant</th>}
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {displayMissions.map(m => (
-                    <tr key={m._id}>
-                      <td><b>{m.reference}</b></td>
-                      <td>{m.clientNom}</td>
-                      <td>{driverMap[m.chauffeurId] || m.chauffeurId || "—"}</td>
-                      <td style={{fontSize:12,maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                        {m.adresseDepart?.split(',')[0]} → {m.adresseArrivee?.split(',')[0]}
-                      </td>
-                      <td>{new Date(m.dateDepart).toLocaleDateString("fr-FR", {year:'2-digit',month:'2-digit',day:'2-digit'})}</td>
-                      <td><span className={`badge ${BADGE[m.statut]}`}>{m.statut}</span></td>
-                      <td><span className={`badge ${PBADGE[m.priorite]}`}>{m.priorite}</span></td>
-                      {!isChauffeur && <td>{m.montant || 0}€</td>}
-                      <td>
-                        <div style={{display:"flex",gap:6,flexWrap:"wrap",fontSize:12}}>
-                          {/* CHAUFFEUR ACTIONS */}
-                          {isChauffeur && m.statut === "assignee" && (
-                            <>
-                              <button className="btn btn-green btn-sm" onClick={() => handleAccepter(m._id)}>✅ Accepter</button>
-                              <button className="btn btn-red btn-sm" onClick={() => setRefuserModal(m._id)}>❌ Refuser</button>
-                            </>
-                          )}
-                          {isChauffeur && m.statut === "acceptee" && (
-                            <button className="btn btn-amber btn-sm" onClick={() => handleStatut(m._id,"en_cours")}>▶ Démarrer</button>
-                          )}
-                          {isChauffeur && m.statut === "en_cours" && (
-                            <button className="btn btn-green btn-sm" onClick={() => handleTerminer(m._id)}>✅ Terminer</button>
-                          )}
-                          {/* INCIDENT */}
-                          {["chauffeur","dispatcher","admin"].includes(user?.role) && !["livree","annulee","refusee"].includes(m.statut) && (
-                            <button className="btn btn-ghost btn-sm" onClick={() => setShowInc(m._id)}>⚠️ Incident</button>
-                          )}
-                          {/* DISPATCHER ACTIONS */}
-                          {isDispatcher && m.statut === "en_attente" && (
-                            <div style={{ display:"flex", gap:6, alignItems:"center", flexWrap:"wrap" }}>
-                              <select
-                                style={{padding:"4px 8px",fontSize:12,borderRadius:6,border:"1px solid var(--border)"}}
-                                value={assignChoix[m._id] || ""}
-                                onChange={e => setAssignChoix({...assignChoix, [m._id]: e.target.value})}
-                              >
-                                <option value="">Choisir un chauffeur</option>
-                                {drivers.map(d => (
-                                  <option key={d._id} value={d.userId || d._id}>{d.First_Name} {d.Last_Name} {d.Hub ? `(${d.Hub})` : ""}</option>
-                                ))}
-                              </select>
-                              <button className="btn btn-blue btn-sm" onClick={() => handleAssign(m._id)}>📋 Assigner</button>
-                            </div>
-                          )}
-                          {isDispatcher && m.statut !== "en_attente" && (
-                            <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(m._id)}>🗑</button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {missionRows}
                 </tbody>
               </table>
             </div>
@@ -322,11 +418,14 @@ export default function Missions() {
                   <label className="form-label">Chauffeur</label>
                   <select value={form.chauffeurId} onChange={e=>setForm({...form,chauffeurId:e.target.value})} required>
                     <option value="">-- Sélectionner un chauffeur --</option>
-                    {drivers.length > 0 ? drivers.map(d => (
-                      <option key={d._id} value={d.userId || d._id}>
-                        {d.First_Name} {d.Last_Name} {d.Hub ? `(${d.Hub})` : ""}
-                      </option>
-                    )) : <option value="" disabled>Aucun chauffeur actif</option>}
+                    {drivers.length > 0 ? drivers.map(d => {
+                      const name = d.First_Name || d.firstName || d.Last_Name || d.lastName || d.name || d.Driver_ID || "Chauffeur";
+                      return (
+                        <option key={d._id} value={d.userId || d._id}>
+                          {`${name}${d.Hub ? ` (${d.Hub})` : ""}`}
+                        </option>
+                      );
+                    }) : <option value="" disabled>Aucun chauffeur actif</option>}
                   </select>
                 </div>
                 <div className="form-group">

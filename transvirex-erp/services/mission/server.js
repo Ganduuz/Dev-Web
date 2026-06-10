@@ -10,18 +10,45 @@ const EVENT_EXCHANGE = "mission.events";
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.text({ type: "*/*" }));
 
-async function publishMissionEvent(type, payload) {
+// ── Connexion RabbitMQ réutilisable ───────────────────────────────────────────
+let rabbitConn = null;
+let rabbitChannel = null;
+
+async function ensureRabbitConnection() {
   try {
-    const conn = await amqp.connect(RABBITMQ_URL);
-    const channel = await conn.createChannel();
-    await channel.assertExchange(EVENT_EXCHANGE, "fanout", { durable: false });
-    channel.publish(EVENT_EXCHANGE, "", Buffer.from(JSON.stringify({ type, payload })));
-    await channel.close();
-    await conn.close();
+    if (!rabbitConn || rabbitConn.closed) {
+      rabbitConn = await amqp.connect(RABBITMQ_URL);
+      rabbitChannel = await rabbitConn.createChannel();
+      await rabbitChannel.assertExchange(EVENT_EXCHANGE, "fanout", { durable: false });
+      console.log("RabbitMQ connecté ✅");
+    }
+    return rabbitChannel;
   } catch (err) {
-    console.error("Erreur publication événement mission:", err);
+    console.error("Erreur connexion RabbitMQ:", err.message);
+    rabbitConn = null;
+    rabbitChannel = null;
+    return null;
   }
+}
+
+// ── Publication non-bloquante ─────────────────────────────────────────────────
+function publishMissionEvent(type, payload) {
+  // Publication asynchrone sans attendre
+  setImmediate(async () => {
+    try {
+      const channel = await ensureRabbitConnection();
+      if (channel) {
+        channel.publish(EVENT_EXCHANGE, "", Buffer.from(JSON.stringify({ type, payload })));
+        console.log(`Événement publié: ${type}`);
+      }
+    } catch (err) {
+      console.error(`Erreur publication événement ${type}:`, err.message);
+      // Erreur ignorée silencieusement
+    }
+  });
 }
 
 const MONGO_URL ="mongodb://mongo:27017/erp";
@@ -69,7 +96,7 @@ const MissionSchema = new mongoose.Schema({
   dateAcceptation:   { type: Date },
   dateRefus:         { type: Date },
   raisonRefus:       { type: String },
-  incidents:         [{ type: String, description: String, severity: String, date: Date }],
+  incidents:         [{ type: { type: String }, description: String, severity: String, date: Date }],
   rating:            { type: Number, min: 1, max: 5 },
   commentaireClient: { type: String },
 }, { timestamps: true });
@@ -118,9 +145,9 @@ app.post("/missions", authMiddleware, requireRole(["dispatcher","admin"]), async
   try {
     const mission = new Mission({ ...req.body, dispatcherId: req.user.userId });
     await mission.save();
-    await publishMissionEvent("MISSION_CREATED", mission);
+    publishMissionEvent("MISSION_CREATED", mission);
     if (mission.chauffeurId) {
-      await publishMissionEvent("MISSION_PROPOSAL", mission);
+      publishMissionEvent("MISSION_PROPOSAL", mission);
     }
     res.status(201).json(mission);
   } catch (err) {
@@ -139,9 +166,9 @@ app.patch("/missions/:id/statut", authMiddleware, async (req, res) => {
     const mission = await Mission.findOneAndUpdate(query, update, { new: true });
     if (!mission) return res.status(404).json({ error: "Mission non trouvée" });
     if (statut === "livree") {
-      await publishMissionEvent("MISSION_DELIVERED", mission);
+      publishMissionEvent("MISSION_DELIVERED", mission);
     } else {
-      await publishMissionEvent("MISSION_STATUS_UPDATED", mission);
+      publishMissionEvent("MISSION_STATUS_UPDATED", mission);
     }
     res.json(mission);
   } catch (err) {
@@ -159,7 +186,7 @@ app.patch("/missions/:id/assigner", authMiddleware, requireRole(["dispatcher","a
       { new: true }
     );
     if (!mission) return res.status(404).json({ error: "Mission non trouvée" });
-    await publishMissionEvent("MISSION_PROPOSAL", mission);
+    publishMissionEvent("MISSION_PROPOSAL", mission);
     res.json(mission);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -209,7 +236,7 @@ app.patch("/missions/:id/terminer", authMiddleware, requireRole(["chauffeur"]), 
       { new: true }
     );
     if (!mission) return res.status(404).json({ error: "Mission non trouvée ou accès refusé" });
-    await publishMissionEvent("MISSION_DELIVERED", mission);
+    publishMissionEvent("MISSION_DELIVERED", mission);
     res.json(mission);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -219,8 +246,20 @@ app.patch("/missions/:id/terminer", authMiddleware, requireRole(["chauffeur"]), 
 // ── POST /missions/:id/incidents ──────────────────────────────────────────────
 app.post("/missions/:id/incidents", authMiddleware, async (req, res) => {
   try {
-    const { type, description } = req.body;
-    const incident = { type, description, date: new Date() };
+    let incidentPayload = req.body;
+    if (typeof incidentPayload === "string") {
+      const raw = incidentPayload.trim();
+      const typeMatch = raw.match(/type\s*[:=]\s*['"]([^'"]+)['"]/i);
+      const descMatch = raw.match(/description\s*[:=]\s*['"]([^'"]+)['"]/i);
+      const severityMatch = raw.match(/severity\s*[:=]\s*['"]([^'"]+)['"]/i);
+      incidentPayload = {
+        type: typeMatch?.[1],
+        description: descMatch?.[1],
+        severity: severityMatch?.[1] || "medium",
+      };
+    }
+    const { type, description, severity } = incidentPayload;
+    const incident = { type, description, severity, date: new Date() };
     const query = { _id: req.params.id };
     if (req.user.role === "chauffeur") query.chauffeurId = req.user.userId;
     const mission = await Mission.findOneAndUpdate(
@@ -229,7 +268,7 @@ app.post("/missions/:id/incidents", authMiddleware, async (req, res) => {
       { new: true }
     );
     if (!mission) return res.status(404).json({ error: "Mission non trouvée" });
-    await publishMissionEvent("MISSION_INCIDENT", { missionId: req.params.id, incident });
+    publishMissionEvent("MISSION_INCIDENT", { missionId: req.params.id, incident });
     res.json(mission);
   } catch (err) {
     res.status(500).json({ error: err.message });

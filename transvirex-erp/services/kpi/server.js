@@ -101,29 +101,6 @@ app.get("/kpi/dashboard", async (req, res) => {
       },
       kpiHistorique: kpis,
     });
-      incidents: {
-        total: incidents.length,
-        byType: incidentsByType,
-        resolus: incidents.filter(i => i.Status === "Résolu").length,
-      },
-      facturation: {
-        revenuTotal,
-        revenuPaye,
-        factures: invoices.length,
-        enAttente: invoices.filter(i => i.Status === "En attente").length,
-      },
-      chauffeurs: {
-        total: drivers.length,
-        actifs: drivers.filter(d => d.Status === "Actif").length,
-        byHub: driversByHub,
-        topRated: drivers.sort((a,b) => b.Rating - a.Rating).slice(0,3).map(d => ({
-          nom: `${d.First_Name} ${d.Last_Name}`,
-          rating: d.Rating,
-          hub: d.Hub,
-        })),
-      },
-      kpiHistorique: kpis,
-    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
