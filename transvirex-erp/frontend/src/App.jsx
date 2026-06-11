@@ -11,6 +11,7 @@ import Users         from "./pages/Users";
 import Notifications from "./pages/Notifications";
 import Drivers       from "./pages/Drivers";
 import Direction     from "./pages/Direction";
+import NexusAI       from "./pages/NexusAI";
 import { NotifProvider } from "./context/NotifContext";
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
     </AuthProvider>
   );
 }
+
 function PrivateRoute({ children, roles }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="loading"><div className="spinner"/></div>;
@@ -54,9 +56,9 @@ function AppRoutes() {
         <Route path="users"      element={
           <PrivateRoute roles={["admin"]}><Users /></PrivateRoute>
         }/>
+        <Route path="nexus"      element={<NexusAI />} />
       </Route>
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
 }
-

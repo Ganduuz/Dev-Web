@@ -9,6 +9,7 @@ const NAV = [
   { to: "/facturation",  icon: "💶", label: "Facturation",   roles: ["facturation","direction","admin"] },
   { to: "/notifications",icon: "🔔", label: "Notifications", roles: null },
   { to: "/users",        icon: "👥", label: "Utilisateurs",  roles: ["admin","direction"] },
+  { to: "/nexus",        icon: "🤖", label: "NEXUS AI",      roles: null },
 ];
 
 export default function Layout() {

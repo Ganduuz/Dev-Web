@@ -1,5 +1,4 @@
-services:
-
+﻿services:
   mongo:
     image: mongo
     container_name: mongo
@@ -7,13 +6,11 @@ services:
       - "27017:27017"
     volumes:
       - mongodata:/data/db
-
   rabbitmq:
     image: rabbitmq:3-management
     ports:
       - "5672:5672"
       - "15672:15672"
-
   gateway:
     build: ./gateway
     ports:
@@ -26,28 +23,25 @@ services:
       - notification
       - drivers
       - kpi
-
+      - ai
   user:
     build: ./services/user
     ports:
       - "3001:3001"
     depends_on:
       - mongo
-
   mission:
     build: ./services/mission
     ports:
       - "3002:3002"
     depends_on:
       - mongo
-
   tracking:
     build: ./services/tracking
     ports:
       - "3003:3003"
     depends_on:
       - mongo
-
   facturation:
     build: ./services/facturation
     container_name: facturation
@@ -57,7 +51,6 @@ services:
       - mongo
     volumes:
       - archives_data:/archives
-
   notification:
     build: ./services/notification
     environment:
@@ -68,21 +61,34 @@ services:
     depends_on:
       - mongo
       - rabbitmq
-
   drivers:
     build: ./services/drivers
     ports:
       - "3006:3006"
     depends_on:
       - mongo
-
   kpi:
     build: ./services/kpi
     ports:
       - "3007:3007"
     depends_on:
       - mongo
-
+  ai:
+    build: ./services/ai
+    ports:
+      - "5000:5000"
+    environment:
+      - ANTHROPIC_API_KEY=
+      - MISSION_URL=http://mission:3002
+      - TRACKING_URL=http://tracking:3003
+      - DRIVERS_URL=http://drivers:3006
+      - KPI_URL=http://kpi:3007
+    depends_on:
+      - mongo
+      - mission
+      - tracking
+      - drivers
+      - kpi
 volumes:
   mongodata:
   archives_data:

@@ -212,7 +212,7 @@ export default function Missions() {
 
   async function handleRefuser(id) {
     try {
-      await axios.patch(`${API_BASE}/missions/${id}/refuser`, { raison: refuseForm.raison }, { headers });
+      await axios.patch(`http://localhost:3000/missions/${id}/refuser`, { raison: refuseForm.raison }, { headers });
       setRefuserModal(null);
       setRefuseForm({ raison: "" });
       setMsg("Mission refusée");
@@ -290,16 +290,16 @@ async function handleTerminer(id) {
         <td>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",fontSize:12}}>
             {/* CHAUFFEUR ACTIONS */}
-            {isChauffeur && m.statut === "assignee" && (
+            {isChauffeur && ["assignee","assignee","ASSIGNEE","en_attente","EN_ATTENTE"].includes(m.statut) && (
               <>
                 <button className="btn btn-green btn-sm" onClick={() => handleAccepter(m._id)}> Accepter</button>
                 <button className="btn btn-red btn-sm" onClick={() => setRefuserModal(m._id)}> Refuser</button>
               </>
             )}
-            {isChauffeur && m.statut === "acceptee" && (
+            {isChauffeur && ["acceptee","ACCEPTEE"].includes(m.statut) && (
               <button className="btn btn-amber btn-sm" onClick={() => handleStatut(m._id,"en_cours")}>▶ Démarrer</button>
             )}
-            {isChauffeur && m.statut === "en_cours" && (
+            {isChauffeur && ["en_cours","EN_COURS"].includes(m.statut) && (
               <button className="btn btn-green btn-sm" onClick={() => handleTerminer(m._id)}> Terminer</button>
             )}
             {/* INCIDENT */}

@@ -96,6 +96,7 @@ app.use("/facturation", forwardFull("http://facturation:3004"));
 app.use("/notification", forwardFull("http://notification:3005"));
 app.use("/drivers",      forwardFull("http://drivers:3006"));
 app.use("/kpi",          forwardFull("http://kpi:3007"));
+app.use("/ai",           forwardFull("http://ai:5000"));
 
 app.get("/health", async (req, res) => {
   const services = {
